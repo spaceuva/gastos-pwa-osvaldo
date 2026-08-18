@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Gastos</title>
+<meta name="theme-color" content="#1d6fe0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --bg: #eff6ff;
+    --bg-elev: #ffffff;
+    --text: #0c2a4a;
+    --text-dim: #5b7a99;
+    --border: #dbeafe;
+    --brand: #1d6fe0;
+    --brand2: #06b6d4;
+    --brand-text: #ffffff;
+    --bubble-user: #1d6fe0;
+    --bubble-user-text: #ffffff;
+    --bubble-bot: #e0f2fe;
+    --bubble-bot-text: #0c3a5c;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --gradient: linear-gradient(135deg, var(--brand), var(--brand2));
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a1628;
+      --bg-elev: #132239;
+      --text: #e0f2fe;
+      --text-dim: #7ba3c9;
+      --border: #1e3a5c;
+      --brand: #3b82f6;
+      --brand2: #22d3ee;
+      --brand-text: #ffffff;
+      --bubble-user: #3b82f6;
+      --bubble-user-text: #ffffff;
+      --bubble-bot: #1a2f4a;
+      --bubble-bot-text: #e0f2fe;
+      --danger: #f87171;
+      --success: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior-y: contain;
+  }
+  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; position: relative; }
+
+  header.topbar {
+    flex-shrink: 0;
+    padding: 14px 16px calc(10px + env(safe-area-inset-top, 0px));
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    font-weight: 700; font-size: 18px;
+    background: var(--gradient); color: #fff; border-bottom: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header.topbar .brand { display: flex; align-items: center; gap: 8px; }
+  header.topbar .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.5); }
+  header.topbar .dot.on { background: #4ade80; }
+
+  .view { flex: 1; min-height: 0; overflow-y: auto; display: none; }
+  .view.active { display: flex; flex-direction: column; }
+
+  /* ---- Chat ---- */
+  #chat-messages { flex: 1; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .bubble { max-width: 82%; padding: 10px 13px; border-radius: 16px; font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
+  .bubble.user { align-self: flex-end; background: var(--bubble-user); color: var(--bubble-user-text); border-bottom-right-radius: 4px; }
+  .bubble.bot { align-self: flex-start; background: var(--bubble-bot); color: var(--bubble-bot-text); border-bottom-left-radius: 4px; }
+  .bubble.typing { align-self: flex-start; background: var(--bubble-bot); color: var(--text-dim); font-style: italic; }
+  .chat-empty { margin: auto; text-align: center; color: var(--text-dim); font-size: 14px; padding: 20px; }
+
+  .chat-input-bar {
+    flex-shrink: 0;
+    display: flex; gap: 8px; padding: 10px 12px;
+    background: var(--bg-elev); border-top: 1px solid var(--border);
+  }
+  .chat-input-bar input[type=text] {
+    flex: 1; min-height: 44px; border-radius: 22px; border: 1px solid var(--border);
+    padding: 0 16px; font-size: 15px; background: var(--bg); color: var(--text);
+  }
+  .chat-input-bar input[type=text]:focus { outline: 2px solid var(--brand); }
+  .icon-btn {
+    min-width: 44px; min-height: 44px; border-radius: 50%; border: none;
+    background: var(--bubble-bot); color: var(--text); font-size: 18px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .icon-btn.send { background: var(--brand); color: var(--brand-text); }
+  .icon-btn.mic.recording { background: var(--danger); color: #fff; }
+  .icon-btn:disabled { opacity: .5; }
+
+  /* ---- Dashboard ---- */
+  #dashboard { padding: 14px 16px 8px; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .metric-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px; padding: 12px 10px; text-align: center; }
+  .metric-card .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .metric-card .value { font-size: 15px; font-weight: 700; }
+  .metric-card.ingresos .value { color: var(--success); }
+  .metric-card.gastos .value { color: var(--danger); }
+  .metric-card.balance .value { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  .metrics-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .metric-card.mini { padding: 10px 8px; }
+  .metric-card.mini .icon { font-size: 16px; margin-bottom: 2px; }
+  .metric-card.mini .value { font-size: 12.5px; font-weight: 700; }
+
+  .card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 14px; color: var(--text-dim); font-weight: 600; }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 40px 0; }
+
+  .mov-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .mov-item:last-child { border-bottom: none; }
+  .mov-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--bubble-bot); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .mov-info { flex: 1; min-width: 0; }
+  .mov-desc { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mov-cat { font-size: 12px; color: var(--text-dim); }
+  .mov-amount { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .mov-amount.gasto { color: var(--danger); }
+  .mov-amount.ingreso { color: var(--success); }
+
+  .btn {
+    min-height: 44px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-elev); color: var(--text); font-size: 14px; font-weight: 600;
+    padding: 0 16px; cursor: pointer; width: 100%;
+  }
+  .btn.primary { background: var(--gradient); color: var(--brand-text); border-color: transparent; }
+  .btn.ghost { background: transparent; }
+  .btn + .btn { margin-top: 10px; }
+
+  /* ---- Ajustes ---- */
+  #ajustes { padding: 14px 16px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
+  .field input[type=text] {
+    width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid var(--border);
+    padding: 0 14px; font-size: 14px; background: var(--bg-elev); color: var(--text);
+  }
+  .status-line { font-size: 13px; margin-top: 8px; min-height: 18px; }
+  .status-line.ok { color: var(--success); }
+  .status-line.err { color: var(--danger); }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+
+  #install-banner {
+    display: none; position: fixed; left: 12px; right: 12px; bottom: 74px;
+    max-width: 456px; margin: 0 auto; background: var(--brand); color: var(--brand-text);
+    border-radius: 12px; padding: 12px 14px; font-size: 13px;
+    align-items: center; justify-content: space-between; gap: 10px; z-index: 20;
+  }
+  #install-banner button { background: rgba(255,255,255,.2); border: none; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
+
+  /* ---- Tab bar ---- */
+  nav.tabbar {
+    flex-shrink: 0;
+    display: flex; background: var(--bg-elev); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  nav.tabbar button {
+    flex: 1; border: none; background: transparent; color: var(--text-dim);
+    padding: 8px 4px 10px; font-size: 11px; min-height: 56px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    cursor: pointer;
+  }
+  nav.tabbar button .tab-icon { font-size: 20px; }
+  nav.tabbar button.active { color: var(--brand); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span>💰 Gastos</span></div>
+    <div class="brand"><span id="conn-dot" class="dot"></span></div>
+  </header>
+
+  <!-- CHAT -->
+  <section id="view-chat" class="view active">
+    <div id="chat-messages">
+      <div class="chat-empty" id="chat-empty-hint">
+        Escribime un gasto o ingreso, por ejemplo:<br>
+        "gasto hamburguesas 8500"<br>
+        "cobré 350000 de sueldo"<br>
+        "cuánto gasté este mes"
+      </div>
+    </div>
+  </section>
+  <div class="chat-input-bar" id="chat-input-bar">
+    <button class="icon-btn mic" id="btn-mic" title="Dictar" aria-label="Dictar por voz">🎤</button>
+    <input type="text" id="chat-input" placeholder="Escribí tu mensaje..." autocomplete="off">
+    <button class="icon-btn send" id="btn-send" title="Enviar" aria-label="Enviar">➤</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view">
+    <div id="dashboard">
+      <div class="metrics">
+        <div class="metric-card ingresos">
+          <div class="label">Ingresos</div>
+          <div class="value" id="m-ingresos">$0</div>
+        </div>
+        <div class="metric-card gastos">
+          <div class="label">Gastos</div>
+          <div class="value" id="m-gastos">$0</div>
+        </div>
+        <div class="metric-card balance">
+          <div class="label">Balance</div>
+          <div class="value" id="m-balance">$0</div>
+        </div>
+      </div>
+
+      <div class="metrics-mini">
+        <div class="metric-card mini">
+          <div class="icon">🏆</div>
+          <div class="label">Categoría top</div>
+          <div class="value" id="m-cat-top">—</div>
+        </div>
+        <div class="metric-card mini">
+          <div class="icon">📆</div>
+          <div class="label">Promedio diario</div>
+          <div class="value" id="m-promedio">$0</div>
+        </div>
+        <div class="metric-card mini">
+          <div class="icon">🧾</div>
+          <div class="label">Movimientos</div>
+          <div class="value" id="m-cantidad">0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Tendencia (últimos 14 días)</h3>
+        <div class="chart-wrap" style="height:160px;">
+          <canvas id="chart-tendencia"></canvas>
+          <div class="chart-empty" id="tendencia-empty" style="display:none;">Todavía no hay datos suficientes</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Gastos por categoría</h3>
+        <div class="chart-wrap">
+          <canvas id="chart-categorias"></canvas>
+          <div class="chart-empty" id="chart-empty" style="display:none;">Todavía no hay gastos cargados</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Últimos movimientos</h3>
+        <div id="mov-list">
+          <div class="chart-empty">Todavía no hay movimientos</div>
+        </div>
+      </div>
+
+      <button class="btn primary" id="btn-refresh">🔄 Actualizar</button>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section id="view-ajustes" class="view">
+    <div id="ajustes">
+      <div class="field">
+        <label for="input-webhook">URL del webhook de n8n</label>
+        <input type="text" id="input-webhook" placeholder="https://tu-n8n.dominio.com/webhook/gastos">
+        <div class="status-line" id="webhook-status"></div>
+      </div>
+      <div class="field">
+        <label for="input-apikey">Clave de acceso</label>
+        <input type="text" id="input-apikey" placeholder="Clave que te dio quien armó el sistema">
+      </div>
+      <button class="btn primary" id="btn-guardar-webhook">Guardar</button>
+      <button class="btn ghost" id="btn-probar">Probar conexión</button>
+
+      <div class="card" style="margin-top: 24px;">
+        <h3>Instalar app</h3>
+        <button class="btn primary" id="btn-instalar">📲 Instalar en el celular</button>
+        <div class="hint" id="install-hint">
+          En iPhone: tocá "Compartir" y después "Agregar a pantalla de inicio".
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Modo demo</h3>
+        <button class="btn ghost" id="btn-demo">Cargar datos de ejemplo</button>
+        <button class="btn ghost" id="btn-borrar-todo">Borrar todos los datos locales</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="install-banner">
+    <span>Instalá la app para usarla como una app nativa</span>
+    <button id="btn-install-banner">Instalar</button>
+  </div>
+
+  <nav class="tabbar">
+    <button class="tab-btn active" data-view="chat"><span class="tab-icon">💬</span>Chat</button>
+    <button class="tab-btn" data-view="dashboard"><span class="tab-icon">📊</span>Dashboard</button>
+    <button class="tab-btn" data-view="ajustes"><span class="tab-icon">⚙️</span>Ajustes</button>
+  </nav>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ==================== Utilidades ==================== */
+  var LS_WEBHOOK = "gastos_webhook_url";
+  var LS_APIKEY = "gastos_api_key";
+  var LS_MOVS = "gastos_movimientos";
+
+  var CATS_GASTO = ["Alimentos", "Transporte", "Vivienda", "Servicios", "Salud", "Entretenimiento", "Ropa", "Educacion", "Otros"];
+  var CATS_INGRESO = ["Sueldo", "Freelance", "Ventas", "Reintegro", "Otros"];
+
+  var CAT_ICONS = {
+    Alimentos: "🍔", Transporte: "🚗", Vivienda: "🏠", Servicios: "💡", Salud: "💊",
+    Entretenimiento: "🎬", Ropa: "👕", Educacion: "📚", Otros: "🔖",
+    Sueldo: "💼", Freelance: "🧑‍💻", Ventas: "🛒", Reintegro: "↩️"
+  };
+
+  function fmtMonto(n) {
+    n = Number(n) || 0;
+    var neg = n < 0;
+    n = Math.abs(n);
+    var parts = n.toFixed(2).split(".");
+    var ent = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    var dec = parts[1];
+    return "$" + (neg ? "-" : "") + ent + (dec === "00" ? "" : "," + dec);
+  }
+
+  function getMovs() {
+    try { return JSON.parse(localStorage.getItem(LS_MOVS) || "[]"); }
+    catch (e) { return []; }
+  }
+  function saveMovs(arr) { localStorage.setItem(LS_MOVS, JSON.stringify(arr)); }
+  function addMov(mov) {
+    var arr = getMovs();
+    arr.push(mov);
+    saveMovs(arr);
+  }
+  function getWebhookUrl() { return (localStorage.getItem(LS_WEBHOOK) || "").trim(); }
+  function setWebhookUrl(url) { localStorage.setItem(LS_WEBHOOK, url); }
+  function getApiKey() { return (localStorage.getItem(LS_APIKEY) || "").trim(); }
+  function setApiKey(key) { localStorage.setItem(LS_APIKEY, key); }
+
+  function hoyISO() { return new Date().toISOString().slice(0, 10); }
+  function mesActualPrefix() { return hoyISO().slice(0, 7); }
+
+  /* ==================== Navegación por tabs ==================== */
+  var tabButtons = document.querySelectorAll(".tab-btn");
+  var views = {
+    chat: document.getElementById("view-chat"),
+    dashboard: document.getElementById("view-dashboard"),
+    ajustes: document.getElementById("view-ajustes")
+  };
+  function showView(name) {
+    Object.keys(views).forEach(function (k) {
+      views[k].classList.toggle("active", k === name);
+    });
+    tabButtons.forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-view") === name);
+    });
+    document.getElementById("chat-input-bar").style.display = name === "chat" ? "flex" : "none";
+    if (name === "dashboard") refreshDashboardFromLocal();
+  }
+  tabButtons.forEach(function (b) {
+    b.addEventListener("click", function () { showView(b.getAttribute("data-view")); });
+  });
+
+  /* ==================== Chat ==================== */
+  var chatMessages = document.getElementById("chat-messages");
+  var chatEmptyHint = document.getElementById("chat-empty-hint");
+  var chatInput = document.getElementById("chat-input");
+  var btnSend = document.getElementById("btn-send");
+  var btnMic = document.getElementById("btn-mic");
+
+  function addBubble(text, who) {
+    if (chatEmptyHint) { chatEmptyHint.remove(); chatEmptyHint = null; }
+    var div = document.createElement("div");
+    div.className = "bubble " + who;
+    div.textContent = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return div;
+  }
+
+  function showTyping() {
+    var div = document.createElement("div");
+    div.className = "bubble typing";
+    div.textContent = "Escribiendo...";
+    div.id = "typing-indicator";
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+  function hideTyping() {
+    var el = document.getElementById("typing-indicator");
+    if (el) el.remove();
+  }
+
+  function updateConnDot() {
+    var dot = document.getElementById("conn-dot");
+    dot.classList.toggle("on", !!getWebhookUrl());
+  }
+
+  async function enviarMensaje(texto) {
+    if (!texto || !texto.trim()) return;
+    addBubble(texto, "user");
+    chatInput.value = "";
+    showTyping();
+    btnSend.disabled = true;
+
+    var webhook = getWebhookUrl();
+    try {
+      var reply;
+      if (webhook) {
+        reply = await llamarWebhook(webhook, texto);
+      } else {
+        reply = simularRespuesta(texto);
+      }
+      hideTyping();
+      addBubble(reply, "bot");
+    } catch (err) {
+      hideTyping();
+      var msg = /No autorizado/.test(err && err.message) ? "🔒 " + err.message : "⚠️ No pude conectar con el webhook. Revisá la URL en Ajustes.";
+      addBubble(msg, "bot");
+    }
+    btnSend.disabled = false;
+  }
+
+  async function llamarWebhook(url, texto) {
+    var res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": getApiKey() },
+      body: JSON.stringify({ texto: texto, source: "webapp" })
+    });
+    if (res.status === 401) throw new Error("No autorizado: revisá la clave de acceso en Ajustes.");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    var data = await res.json();
+    var reply = data && data.reply ? data.reply : "(sin respuesta)";
+    registrarSiCorresponde(reply, texto);
+    return reply;
+  }
+
+  /* Si la respuesta confirma un gasto/ingreso, lo guardamos en el historial local para el dashboard */
+  function registrarSiCorresponde(reply, textoOriginal) {
+    var esGasto = /✅ Gasto registrado/i.test(reply);
+    var esIngreso = /✅ Ingreso registrado/i.test(reply);
+    if (!esGasto && !esIngreso) return;
+
+    var lineas = reply.split("\n").filter(Boolean);
+    var descripcion = lineas[1] || textoOriginal;
+    var montoMatch = reply.match(/\$([\d.,]+)/);
+    var monto = montoMatch ? parseFloat(montoMatch[1].replace(/\./g, "").replace(",", ".")) : 0;
+    var catMatch = reply.match(/🏷️\s*(.+)/);
+    var categoria = catMatch ? catMatch[1].trim() : "Otros";
+
+    addMov({
+      tipo: esIngreso ? "ingreso" : "gasto",
+      monto: monto,
+      categoria: categoria,
+      descripcion: descripcion,
+      fecha: hoyISO()
+    });
+  }
+
+  /* ---- Modo demo: simula el backend sin webhook configurado ---- */
+  function detectarCategoria(textoLower, tipo) {
+    var mapaGasto = {
+      Alimentos: ["hamburguesa", "comida", "super", "almuerzo", "cena", "cafe", "restaurante", "delivery"],
+      Transporte: ["nafta", "uber", "subte", "colectivo", "taxi", "combustible", "peaje"],
+      Vivienda: ["alquiler", "expensas"],
+      Servicios: ["luz", "gas", "internet", "celular", "agua", "telefono"],
+      Salud: ["farmacia", "medico", "remedio", "dentista"],
+      Entretenimiento: ["cine", "streaming", "netflix", "salida", "bar"],
+      Ropa: ["ropa", "zapatillas", "zapatos", "remera", "pantalon"],
+      Educacion: ["curso", "colegio", "universidad", "libro"]
+    };
+    var mapaIngreso = {
+      Sueldo: ["sueldo", "salario", "haberes"],
+      Freelance: ["freelance", "laburo extra", "changa"],
+      Ventas: ["venta", "vendi"],
+      Reintegro: ["reintegro", "devolucion"]
+    };
+    var mapa = tipo === "ingreso" ? mapaIngreso : mapaGasto;
+    for (var cat in mapa) {
+      for (var i = 0; i < mapa[cat].length; i++) {
+        if (textoLower.indexOf(mapa[cat][i]) !== -1) return cat;
+      }
+    }
+    return "Otros";
+  }
+
+  function simularRespuesta(texto) {
+    var t = texto.toLowerCase().trim();
+
+    if (/resumen|cuanto gast|cuánto gast|cuanto cobr|cuánto cobr|como vengo|cómo vengo/.test(t)) {
+      return construirResumenLocal();
+    }
+
+    var montoMatch = t.match(/(\d[\d.,]*)/);
+    if (!montoMatch) {
+      return "🤔 No entendí (modo demo).\n\nProbá con algo así:\n• gasto hamburguesas 8500\n• cobré 350000 de sueldo\n• resumen";
+    }
+    var monto = parseFloat(montoMatch[1].replace(/\./g, "").replace(",", "."));
+    var esIngreso = /cobr|ingres|gan[eé]/.test(t);
+    var tipo = esIngreso ? "ingreso" : "gasto";
+    var categoria = detectarCategoria(t, tipo);
+    var descripcion = texto.replace(montoMatch[1], "").trim() || (tipo === "ingreso" ? "Ingreso" : "Gasto");
+
+    addMov({ tipo: tipo, monto: monto, categoria: categoria, descripcion: descripcion, fecha: hoyISO() });
+
+    if (esIngreso) {
+      return "✅ Ingreso registrado (demo)\n\n" + descripcion + "\n💵 " + fmtMonto(monto) + "\n🏷️ " + categoria;
+    }
+    return "✅ Gasto registrado (demo)\n\n" + descripcion + "\n💵 " + fmtMonto(monto) + "\n🏷️ " + categoria;
+  }
+
+  function construirResumenLocal() {
+    var prefix = mesActualPrefix();
+    var movs = getMovs().filter(function (m) { return String(m.fecha || "").indexOf(prefix) === 0; });
+    var ingresos = 0, gastos = 0;
+    var porCategoria = {};
+    movs.forEach(function (m) {
+      if (m.tipo === "ingreso") ingresos += Number(m.monto) || 0;
+      else {
+        gastos += Number(m.monto) || 0;
+        porCategoria[m.categoria] = (porCategoria[m.categoria] || 0) + (Number(m.monto) || 0);
+      }
+    });
+    var balance = ingresos - gastos;
+    var desglose = Object.keys(porCategoria)
+      .sort(function (a, b) { return porCategoria[b] - porCategoria[a]; })
+      .map(function (c) { return "  • " + c + ": " + fmtMonto(porCategoria[c]); })
+      .join("\n") || "  (sin gastos)";
+    return "📅 Resumen del mes (demo)\n\n💰 Ingresos: " + fmtMonto(ingresos) +
+      "\n💸 Gastos: " + fmtMonto(gastos) +
+      "\n📊 Balance: " + fmtMonto(balance) +
+      "\n\nGastos por categoría:\n" + desglose +
+      "\n\n" + movs.length + " movimientos registrados";
+  }
+
+  btnSend.addEventListener("click", function () { enviarMensaje(chatInput.value); });
+  chatInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); enviarMensaje(chatInput.value); }
+  });
+
+  /* ---- Micrófono (Web Speech API) ---- */
+  var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognizing = false;
+  var recognizer = null;
+  if (SpeechRecognitionCtor) {
+    recognizer = new SpeechRecognitionCtor();
+    recognizer.lang = "es-AR";
+    recognizer.continuous = false;
+    recognizer.interimResults = false;
+    recognizer.onresult = function (e) {
+      var texto = e.results[0][0].transcript;
+      chatInput.value = texto;
+      enviarMensaje(texto);
+    };
+    recognizer.onend = function () {
+      recognizing = false;
+      btnMic.classList.remove("recording");
+    };
+    recognizer.onerror = function () {
+      recognizing = false;
+      btnMic.classList.remove("recording");
+    };
+    btnMic.addEventListener("click", function () {
+      if (recognizing) { recognizer.stop(); return; }
+      recognizing = true;
+      btnMic.classList.add("recording");
+      recognizer.start();
+    });
+  } else {
+    btnMic.disabled = true;
+    btnMic.title = "Dictado no disponible en este navegador";
+  }
+
+  /* ==================== Dashboard ==================== */
+  var chartInstance = null;
+
+  function refreshDashboardFromLocal() {
+    var prefix = mesActualPrefix();
+    var movs = getMovs();
+    var movsMes = movs.filter(function (m) { return String(m.fecha || "").indexOf(prefix) === 0; });
+
+    var ingresos = 0, gastos = 0;
+    var porCategoria = {};
+    movsMes.forEach(function (m) {
+      if (m.tipo === "ingreso") ingresos += Number(m.monto) || 0;
+      else {
+        gastos += Number(m.monto) || 0;
+        porCategoria[m.categoria] = (porCategoria[m.categoria] || 0) + (Number(m.monto) || 0);
+      }
+    });
+
+    document.getElementById("m-ingresos").textContent = fmtMonto(ingresos);
+    document.getElementById("m-gastos").textContent = fmtMonto(gastos);
+    document.getElementById("m-balance").textContent = fmtMonto(ingresos - gastos);
+
+    var catTop = Object.keys(porCategoria).sort(function (a, b) { return porCategoria[b] - porCategoria[a]; })[0];
+    document.getElementById("m-cat-top").textContent = catTop ? ((CAT_ICONS[catTop] || "🔖") + " " + catTop) : "—";
+    var diasDelMes = new Date().getDate();
+    document.getElementById("m-promedio").textContent = fmtMonto(gastos / diasDelMes);
+    document.getElementById("m-cantidad").textContent = String(movsMes.length);
+
+    renderChart(porCategoria);
+    renderTendencia(movs);
+    renderMovList(movs.slice(-6).reverse());
+  }
+
+  var tendenciaInstance = null;
+
+  function renderTendencia(movs) {
+    var canvas = document.getElementById("chart-tendencia");
+    var emptyEl = document.getElementById("tendencia-empty");
+
+    var dias = [];
+    for (var i = 13; i >= 0; i--) {
+      var d = new Date();
+      d.setDate(d.getDate() - i);
+      dias.push(d.toISOString().slice(0, 10));
+    }
+    var porDia = {};
+    dias.forEach(function (d) { porDia[d] = 0; });
+    movs.forEach(function (m) {
+      if (m.tipo !== "gasto") return;
+      if (porDia.hasOwnProperty(m.fecha)) porDia[m.fecha] += Number(m.monto) || 0;
+    });
+
+    var hayDatos = dias.some(function (d) { return porDia[d] > 0; });
+    if (!hayDatos) {
+      canvas.style.display = "none";
+      emptyEl.style.display = "block";
+      if (tendenciaInstance) { tendenciaInstance.destroy(); tendenciaInstance = null; }
+      return;
+    }
+    canvas.style.display = "block";
+    emptyEl.style.display = "none";
+
+    var labels = dias.map(function (d) { return d.slice(8, 10) + "/" + d.slice(5, 7); });
+    var data = dias.map(function (d) { return porDia[d]; });
+    var textDim = getComputedStyle(document.body).getPropertyValue("--text-dim") || "#999";
+
+    if (tendenciaInstance) tendenciaInstance.destroy();
+    tendenciaInstance = new Chart(canvas.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{ data: data, backgroundColor: "#1d6fe0", borderRadius: 4, maxBarThickness: 18 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: textDim, font: { size: 9 } } },
+          y: { display: false }
+        }
+      }
+    });
+  }
+
+  function renderChart(porCategoria) {
+    var canvas = document.getElementById("chart-categorias");
+    var emptyEl = document.getElementById("chart-empty");
+    var labels = Object.keys(porCategoria);
+    if (!labels.length) {
+      canvas.style.display = "none";
+      emptyEl.style.display = "block";
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      return;
+    }
+    canvas.style.display = "block";
+    emptyEl.style.display = "none";
+    var data = labels.map(function (l) { return porCategoria[l]; });
+    var colores = ["#1d6fe0", "#06b6d4", "#f97316", "#22c55e", "#f43f5e", "#a855f7", "#eab308", "#0ea5e9", "#14b8a6"];
+
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(canvas.getContext("2d"), {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{ data: data, backgroundColor: colores, borderWidth: 0 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { color: getComputedStyle(document.body).getPropertyValue("--text") || "#333", boxWidth: 12, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  function renderMovList(movs) {
+    var el = document.getElementById("mov-list");
+    if (!movs.length) {
+      el.innerHTML = '<div class="chart-empty">Todavía no hay movimientos</div>';
+      return;
+    }
+    el.innerHTML = movs.map(function (m) {
+      var icon = CAT_ICONS[m.categoria] || "🔖";
+      var sign = m.tipo === "ingreso" ? "+" : "-";
+      return '<div class="mov-item">' +
+        '<div class="mov-icon">' + icon + '</div>' +
+        '<div class="mov-info">' +
+          '<div class="mov-desc">' + escapeHtml(m.descripcion || "") + '</div>' +
+          '<div class="mov-cat">' + escapeHtml(m.categoria || "") + '</div>' +
+        '</div>' +
+        '<div class="mov-amount ' + m.tipo + '">' + sign + fmtMonto(m.monto) + '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  document.getElementById("btn-refresh").addEventListener("click", async function () {
+    var webhook = getWebhookUrl();
+    if (!webhook) { refreshDashboardFromLocal(); return; }
+    this.textContent = "Actualizando...";
+    this.disabled = true;
+    try {
+      await llamarWebhook(webhook, "resumen");
+    } catch (e) { /* si falla, igual refrescamos con lo que haya local */ }
+    refreshDashboardFromLocal();
+    this.textContent = "🔄 Actualizar";
+    this.disabled = false;
+  });
+
+  /* ==================== Ajustes ==================== */
+  var inputWebhook = document.getElementById("input-webhook");
+  var inputApiKey = document.getElementById("input-apikey");
+  var webhookStatus = document.getElementById("webhook-status");
+
+  inputWebhook.value = getWebhookUrl();
+  inputApiKey.value = getApiKey();
+  updateConnDot();
+
+  document.getElementById("btn-guardar-webhook").addEventListener("click", function () {
+    setWebhookUrl(inputWebhook.value.trim());
+    setApiKey(inputApiKey.value.trim());
+    webhookStatus.textContent = "Guardado.";
+    webhookStatus.className = "status-line ok";
+    updateConnDot();
+  });
+
+  document.getElementById("btn-probar").addEventListener("click", async function () {
+    var url = inputWebhook.value.trim();
+    if (!url) {
+      webhookStatus.textContent = "Pegá una URL primero.";
+      webhookStatus.className = "status-line err";
+      return;
+    }
+    webhookStatus.textContent = "Conectando...";
+    webhookStatus.className = "status-line";
+    try {
+      await fetch(url, { method: "OPTIONS" });
+      webhookStatus.textContent = "✅ El servidor respondió.";
+      webhookStatus.className = "status-line ok";
+    } catch (e) {
+      webhookStatus.textContent = "❌ No se pudo conectar. Revisá la URL y el CORS.";
+      webhookStatus.className = "status-line err";
+    }
+  });
+
+  document.getElementById("btn-demo").addEventListener("click", function () {
+    var ejemplo = [
+      { tipo: "gasto", monto: 8500, categoria: "Alimentos", descripcion: "Hamburguesas", fecha: hoyISO() },
+      { tipo: "gasto", monto: 12000, categoria: "Servicios", descripcion: "Factura de luz", fecha: hoyISO() },
+      { tipo: "gasto", monto: 9000, categoria: "Transporte", descripcion: "Uber", fecha: hoyISO() },
+      { tipo: "ingreso", monto: 350000, categoria: "Sueldo", descripcion: "Sueldo del mes", fecha: hoyISO() },
+      { tipo: "gasto", monto: 22000, categoria: "Entretenimiento", descripcion: "Cine", fecha: hoyISO() },
+      { tipo: "gasto", monto: 35000, categoria: "Alimentos", descripcion: "Supermercado", fecha: hoyISO() }
+    ];
+    saveMovs(getMovs().concat(ejemplo));
+    refreshDashboardFromLocal();
+    showView("dashboard");
+  });
+
+  document.getElementById("btn-borrar-todo").addEventListener("click", function () {
+    if (!confirm("¿Borrar todos los movimientos guardados en este dispositivo?")) return;
+    localStorage.removeItem(LS_MOVS);
+    refreshDashboardFromLocal();
+  });
+
+  /* ==================== Instalación PWA ==================== */
+  var deferredPrompt = null;
+  var installBanner = document.getElementById("install-banner");
+  var isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.style.display = "flex";
+  });
+
+  function dispararInstalacion() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function () {
+        deferredPrompt = null;
+        installBanner.style.display = "none";
+      });
+    } else if (isiOS) {
+      alert('En iPhone: tocá el ícono de "Compartir" en Safari y elegí "Agregar a pantalla de inicio".');
+    } else {
+      alert("Para instalar: abrí el menú del navegador y elegí \"Instalar app\" o \"Agregar a pantalla de inicio\".");
+    }
+  }
+  document.getElementById("btn-instalar").addEventListener("click", dispararInstalacion);
+  document.getElementById("btn-install-banner").addEventListener("click", dispararInstalacion);
+
+  if (isiOS) {
+    document.getElementById("install-hint").style.display = "block";
+  } else {
+    document.getElementById("install-hint").style.display = "none";
+  }
+
+  /* ==================== Service worker ==================== */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline/file:// */ });
+    });
+  }
+
+  /* ==================== Init ==================== */
+  refreshDashboardFromLocal();
+})();
+</script>
+</body>
+</html>
